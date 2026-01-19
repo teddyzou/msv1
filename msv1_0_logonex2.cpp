@@ -3169,3 +3169,88 @@ LABEL_947:
   }
   return (unsigned int)NetworkProfile;
 }
+
+__int64 __fastcall NtLmDecodeSecret(WCHAR *SourceString, HANDLE Token, _QWORD *a3)
+{
+  __int64 result; // rax
+  WCHAR *v7; // rsi
+  char v8; // r12
+  DWORD v9; // r15d
+  __int64 v10; // rbp
+  int v11; // ebx
+  struct _UNICODE_STRING DestinationString; // [rsp+30h] [rbp-48h] BYREF
+  DWORD pcchMaxChars; // [rsp+90h] [rbp+18h] BYREF
+  CRED_PROTECTION_TYPE pProtectionType; // [rsp+98h] [rbp+20h] BYREF
+
+  result = 0;
+  *(_QWORD *)&DestinationString.Length = 0;
+  DestinationString.Buffer = 0;
+  pcchMaxChars = 0;
+  v7 = 0;
+  v8 = 0;
+  v9 = 0;
+  if ( !a3 )
+    return 3221225485LL;
+  *a3 = 0;
+  a3[1] = 0;
+  if ( SourceString )
+  {
+    v10 = -1;
+    do
+      ++v10;
+    while ( SourceString[v10] );
+    if ( !CredIsProtectedW(SourceString, &pProtectionType) )
+      return (unsigned int)-1073741811;
+    if ( pProtectionType == CredUserProtection )
+    {
+      if ( Token )
+      {
+        if ( !SetThreadToken(0, Token) )
+          return (unsigned int)-1073741555;
+      }
+      else
+      {
+        v11 = (*(__int64 (__fastcall **)(_QWORD))(LsaFunctions + 88))((unsigned int)(pProtectionType - 1));
+        if ( v11 < 0 )
+          return (unsigned int)v11;
+      }
+      v8 = 1;
+    }
+    else if ( pProtectionType != CredTrustedProtection )
+    {
+      v7 = SourceString;
+LABEL_25:
+      RtlInitUnicodeString(&DestinationString, v7);
+      v11 = NtLmDuplicateUnicodeString(a3, &DestinationString);
+      goto LABEL_26;
+    }
+    if ( CredUnprotectW(0, SourceString, v10 + 1, 0, &pcchMaxChars) )
+      goto LABEL_25;
+    if ( GetLastError() == 122 && pcchMaxChars )
+    {
+      v9 = 2 * pcchMaxChars;
+      v7 = (WCHAR *)NtLmAllocate(2 * pcchMaxChars);
+      if ( !v7 )
+      {
+        v11 = -1073741670;
+LABEL_26:
+        if ( v8 )
+          RevertToSelf();
+        if ( v7 )
+        {
+          if ( v7 != SourceString )
+          {
+            memset(v7, 0, v9);
+            NtLmFree(v7);
+          }
+        }
+        return (unsigned int)v11;
+      }
+      if ( CredUnprotectW(0, SourceString, v10 + 1, v7, &pcchMaxChars) && (!pcchMaxChars || !v7[pcchMaxChars - 1]) )
+        goto LABEL_25;
+    }
+    v11 = -1073741811;
+    goto LABEL_26;
+  }
+  return result;
+}
